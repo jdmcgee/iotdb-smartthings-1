@@ -114,8 +114,26 @@ class SmartThings(object):
             headers=command_headerd,
             data=json.dumps(requestd)
         )
+    def rest_request(self,rest_request, parameters):
+        if not parameters or parameters==None or parameters=="":
+            parameters = []
+        elif type(parameters)==type(""):
+            parameters = json.loads(parameters)
+            
+        rest_url = "https://graph.api.smartthings.com%s/%s" % ( self.endpointd["url"], rest_request, )
+        rest_paramd = parameters
+        rest_headerd = {
+            "Authorization": "Bearer %s" % self.std["access_token"],
+        }
+        
+        
+        
+        rest_response = requests.get(url=rest_url, params=rest_paramd, headers=rest_headerd)
+        rest_payload = rest_response.json()
+        return rest_payload
 
-if __name__ == '__main__':
+
+def cli():
     dtypes = [ 
         "switch", "motion", "presence", "acceleration", "contact", 
         "temperature", "battery", "acceleration", "threeAxis",
@@ -151,38 +169,126 @@ if __name__ == '__main__':
         dest = "request",
         help = "Something to do, e.g. 'switch=1', 'switch=0'"
     )
+    
+    parser.add_option(
+        "", "--rest",
+        dest = "rest_request",
+        help = "Issue a rest request to the smartthings app"
+    )
 
+    parser.add_option(
+        "", "--rest_param",
+        dest = "rest_param",
+        help = "holds rest call parameters"
+    )
+    
     (options, args) = parser.parse_args()
 
-    if not options.device_type:
+    
+    if not options.rest_request and not options.device_type:
         print >> sys.stderr, "%s: --type <%s>" % ( sys.argv[0], "|".join(dtypes))
         parser.print_help(sys.stderr)
         sys.exit(1)
-        
 
     st = SmartThings(verbose=options.verbose)
     st.load_settings()
     st.request_endpoints()
-
-    ds = st.request_devices(options.device_type)
-
-    if options.device_id:
-        ds = filter(lambda d: options.device_id in [ d.get("id"), d.get("label"), ], ds)
-
-    if options.request:
-        key, value = options.request.split('=', 2)
-        try:
-            value = int(value)
-        except ValueError:
-            pass
-
-        requestd = {
-            key: value
-        }
-
-        for d in ds:
-            iotdb_log.log(device=d, request=requestd)
-            st.device_request(d, requestd)
-
+    
+    if options.rest_request:
+         pprint.pprint( st.rest_request(options.rest_request, options.rest_param))
     else:
-        print json.dumps(ds, indent=2, sort_keys=True)
+        ds = st.request_devices(options.device_type)
+    
+        if options.device_id:
+            ds = filter(lambda d: options.device_id in [ d.get("id"), d.get("label"), ], ds)
+    
+        if options.request:
+            key, value = options.request.split('=', 2)
+            try:
+                value = int(value)
+            except ValueError:
+                pass
+    
+            requestd = {
+                key: value
+            }
+    
+            for d in ds:
+                iotdb_log.log(device=d, request=requestd)
+                st.device_request(d, requestd)
+    
+        else:
+            print json.dumps(ds, indent=2, sort_keys=True)
+
+if __name__ == '__main__':
+    # dtypes = [ 
+    #     "switch", "motion", "presence", "acceleration", "contact", 
+    #     "temperature", "battery", "acceleration", "threeAxis",
+    # ]
+    # 
+    # parser = OptionParser()
+    # parser.add_option(
+    #     "", "--debug",
+    #     default = False,
+    #     action = "store_true",
+    #     dest = "debug",
+    #     help = "",
+    # )
+    # parser.add_option(
+    #     "", "--verbose",
+    #     default = False,
+    #     action = "store_true",
+    #     dest = "verbose",
+    #     help = "",
+    # )
+    # parser.add_option(
+    #     "", "--type",
+    #     dest = "device_type",
+    #     help = "The device type (required), one of %s" % ", ".join(dtypes)
+    # )
+    # parser.add_option(
+    #     "", "--id",
+    #     dest = "device_id",
+    #     help = "The ID or Name of the device to manipulate"
+    # )
+    # parser.add_option(
+    #     "", "--request",
+    #     dest = "request",
+    #     help = "Something to do, e.g. 'switch=1', 'switch=0'"
+    # )
+    # 
+    # (options, args) = parser.parse_args()
+    # 
+    # if not options.device_type:
+    #     print >> sys.stderr, "%s: --type <%s>" % ( sys.argv[0], "|".join(dtypes))
+    #     parser.print_help(sys.stderr)
+    #     sys.exit(1)
+    #     
+    # 
+    # st = SmartThings(verbose=options.verbose)
+    # st.load_settings()
+    # st.request_endpoints()
+    # 
+    # ds = st.request_devices(options.device_type)
+    # 
+    # if options.device_id:
+    #     ds = filter(lambda d: options.device_id in [ d.get("id"), d.get("label"), ], ds)
+    # 
+    # if options.request:
+    #     key, value = options.request.split('=', 2)
+    #     try:
+    #         value = int(value)
+    #     except ValueError:
+    #         pass
+    # 
+    #     requestd = {
+    #         key: value
+    #     }
+    # 
+    #     for d in ds:
+    #         iotdb_log.log(device=d, request=requestd)
+    #         st.device_request(d, requestd)
+    # 
+    # else:
+    #     print json.dumps(ds, indent=2, sort_keys=True)
+    cli()
