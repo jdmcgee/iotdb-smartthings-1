@@ -113,12 +113,25 @@ mappings {
             PUT: "_api_put"
         ]
     }
+    path("/site") {
+      action: [
+        GET: "_api_site"
+        ]
+    }
+    path("/room") {
+      action: [
+      	GET: "_api_room"
+        ]
+    }
+        	
+    
 }
 
 /*
  *  This function is called once when the app is installed
  */
 def installed() {
+	state.site = 'Fisher Family'
     _event_subscribe()
 }
 
@@ -130,6 +143,7 @@ def updated()
 {
     log.debug "updated"
     unsubscribe()
+    state.site = state.site = 'Fisher Family'
     _event_subscribe()
 }
 
@@ -192,6 +206,42 @@ def _api_put()
     }
 }
 
+def getDeviceData(dev)
+{
+	def resp = []
+    
+	switch(dev.name)
+    {
+    	case "Aeon SmartStrip":
+            resp = [device:dev, switch:dev.switchState, power:dev.powerState, energy:dev.energyState]
+            resp << [childSwitches:[switch1:dev.switch1State, switch2:dev.switch2State, switch3:dev.switch3State, switch4:dev.switch4State]]
+			resp << [childEngery:[energy1:dev.energy1State, energy2:dev.energy2State, energy3:dev.energy3State, energy4:dev.energy4State]]
+            resp << [childPower:[power1:dev.power1State, power2:dev.power2State, power3:dev.power3State, power4:dev.powerState]]
+            break
+       case "SmartSense Motion/Temp Sensor":
+       		resp = [device:dev, temperature:dev.temperatureState, battery:dev.batteryState, motion:dev.motionState]
+            break
+	}
+    return resp
+}
+
+def findDevice(devList, devLabel)
+{
+	log.debug("findDevice:230")
+	def resp = null
+    for(dev in devList)
+    {
+    	log.debug("findDevice:233 ${dev.label}")
+    	if(dev.label==devLabel)
+        {
+        	def tresp = getDeviceData(dev)
+            def foundDevice =  [label:dev.label, device:dev, chidren:tresp]
+            resp = foundDevice
+        }
+    }
+    return resp
+}
+
 def _api_get()
 {
     def devices = _devices_for_type(params.type)
@@ -201,6 +251,70 @@ def _api_get()
     } else {
         _device_to_json(device, params.type)
     }
+}
+
+def _api_site()
+{
+  def resp = [name:"michel fisher"]
+  
+  return resp
+}
+
+def _api_room()
+{
+	/* parameters
+    	room_name - string name of the room sent from client
+        room_devlabels - a csv list of all device labels in this room
+    
+    	examples:
+    		cli command: --rest room --rest_param='{"room_name":"Michels Office", "room_devlabels":"Aeon SmartStrip 03,Aeon Ss 01,Aeon Ss 02,SmartSense Motion/Temp Sensor 01"}'
+            python:
+            	import * from smartthings
+                import pprint
+                st = SmartThings(verbose=options.verbose)
+    			st.load_settings()
+    			st.request_endpoints()
+                rest_request = "room"
+                rest_params = {
+                				"room_name":"the room name", 
+                        "room_devlabels":"a device labels text,..."
+                              }
+                json_return = st.rest_request(rest_request, rest_param))
+                pprint.print json_return
+     */
+    
+    def resp = []
+    def devLabels = params.room_devlabels.split(",")
+    def room_name = params.room_name
+    log.debug("_api_room:288")
+    for (devLabel in devLabels)
+    {
+    	log.debug("_api_room:291 ${devLabel}")
+        def foundDevice = findDevice(d_switch, devLabel)
+        if (foundDevice!=null)
+        {
+           resp << foundDevice
+        }
+        
+        if(foundDevice==null)
+        {
+        	foundDevice = findDevice(d_motion, devLabel)
+        }
+        if (foundDevice!=null)
+        {
+         	resp << foundDevice
+        }
+    }
+   
+    
+    /* resp << [name:params.room_name]
+    resp << [devices:devNames]
+    resp << [tswitch:tswitch]
+    resp << [switch1:tswitch.switch1State]
+    def s = tswitch.currentState('switch')
+    resp << [state:s]
+    resp << [allDevices:allDevices] */
+    return resp
 }
 
 void _api_update()
